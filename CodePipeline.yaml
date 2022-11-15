@@ -10,7 +10,7 @@ Parameters:
     Default: XeniyaFesenko
   GithubRepo:
     Type: String
-    Default: Fargate-ECSCluster-Cloudformation
+    Default: say-hello-mule4-docker
   GithubBranch:
     Type: String
     Default: master
@@ -19,21 +19,27 @@ Parameters:
     Default: gittoken
   ContainerPort:
     Type: Number
-    Default: 8080
+    Default: 8081
+  ClusterName:
+    Description: ECS Cluster Name
+    Type: String
+  ServiceName:
+    Description: ECS Service Name
+    Type: String
 
 Resources:
 
-  # Create an ECR Repository to store docker images
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Join ['-', [!Ref Stage, !Ref 'AWS::AccountId', 'ecr-repository']]
+#   # Create an ECR Repository to store docker images
+#   ECRRepository:
+#     Type: AWS::ECR::Repository
+#     Properties:
+#       RepositoryName: !Join ['-', [!Ref Stage, !Ref 'AWS::AccountId', 'ecr-repository']]
 
-  # Create an S3 Bucket to store build artifacts
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Join ['-', [!Ref Stage, !Ref 'AWS::AccountId', 's3bucket']]
+#   # Create an S3 Bucket to store build artifacts
+#   S3Bucket:
+#     Type: AWS::S3::Bucket
+#     Properties:
+#       BucketName: !Join ['-', [!Ref Stage, !Ref 'AWS::AccountId', 's3bucket']]
 
   # Create Access Role for CodePipeLine
   CodePipeLineExecutionRole:
@@ -149,27 +155,16 @@ Resources:
         # Deploy the project by executing Fargate-Cluster.yml file in the Source code with Cloudformation.
         - Name: Deploy
           Actions:
-          - Name: Deploy
-            ActionTypeId:
-              Category: Deploy
-              Owner: AWS
-              Version: 1
-              Provider: CloudFormation
-            InputArtifacts:
-              - Name: source-output-artifacts
-              - Name: build-output-artifacts
-            Configuration:
-                ActionMode: CREATE_UPDATE
-                Capabilities: CAPABILITY_NAMED_IAM
-                # Pass parameter values to Fargate-Cluster.yml for deployment
-                ParameterOverrides: !Sub |
-                  {
-                    "ImageURI" : { "Fn::GetParam" : ["build-output-artifacts", "imageDetail.json", "ImageURI"] },
-                    "Stage":  "${Stage}",
-                    "ContainerPort": "${ContainerPort}"
-                  }
-                RoleArn: 
-                  Fn::GetAtt: [ CloudformationExecutionRole, Arn ]
-                StackName: !Join ['-', [!Ref Stage, !Ref 'AWS::AccountId', 'FargateECSCluster']]
-                TemplatePath: source-output-artifacts::Cloudformation/Fargate-Cluster.yml
-            RunOrder: 1
+           - Name: DeployonECS
+             InputArtifacts:
+               - Name: build-output-artifacts
+             ActionTypeId:
+               Category: Deploy
+               Owner: AWS
+               Version: '1'
+               Provider: ECS
+             Configuration:
+               ClusterName: !Ref ClusterName
+               ServiceName: !Ref ServiceName
+#                FileName: !Ref FileName
+             RunOrder: 1
